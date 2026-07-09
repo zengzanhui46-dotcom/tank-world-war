@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  base: './',
+  base: '/tank-world-war/',
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
