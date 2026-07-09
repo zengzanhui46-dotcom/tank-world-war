@@ -1,8 +1,7 @@
 /**
- * 坦克世界大战 - 多人联机服务器
- * 启动: node server/index.js
+ * 坦克世界大战 - 联机服务器 + 静态文件
  */
-
+import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { fileURLToPath } from 'url';
@@ -12,29 +11,31 @@ import GameRoom from './gameRoom.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const httpServer = createServer((req, res) => {
-  // Health check for Render / cloud hosting
-  if (req.url === '/' || req.url === '/health') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      status: 'ok',
-      game: '坦克世界大战',
-      uptime: process.uptime(),
-    }));
-    return;
-  }
-  res.writeHead(200);
-  res.end('Tank World War Server');
+const app = express();
+
+// Serve static game files from dist/
+const distPath = join(__dirname, '..', 'dist');
+app.use(express.static(distPath));
+
+// Health check
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', game: '坦克世界大战', uptime: process.uptime() });
 });
+
+// Fallback to index.html for SPA
+app.get('*', (req, res) => {
+  res.sendFile(join(distPath, 'index.html'));
+});
+
+const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: { origin: '*', methods: ['GET', 'POST'] },
   pingTimeout: 30000,
   pingInterval: 10000,
 });
 
-const rooms = new Map(); // roomCode -> GameRoom
+const rooms = new Map();
 
-// Generate unique short room code
 function genRoomCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code;
@@ -48,7 +49,6 @@ function genRoomCode() {
 io.on('connection', (socket) => {
   console.log(`[连接] ${socket.id}`);
 
-  // --- Room management ---
   socket.on('create_room', ({ playerName }) => {
     const roomCode = genRoomCode();
     const room = new GameRoom(roomCode, socket.id);
@@ -61,42 +61,26 @@ io.on('connection', (socket) => {
 
   socket.on('join_room', ({ roomCode, playerName }) => {
     const room = rooms.get(roomCode);
-    if (!room) {
-      socket.emit('error_msg', '房间不存在');
-      return;
-    }
-    if (!room.addPlayer(socket.id, playerName || '玩家')) {
-      socket.emit('error_msg', '房间已满');
-      return;
-    }
+    if (!room) { socket.emit('error_msg', '房间不存在'); return; }
+    if (!room.addPlayer(socket.id, playerName || '玩家')) { socket.emit('error_msg', '房间已满'); return; }
     socket.join(roomCode);
-    // Notify everyone in room
     io.to(roomCode).emit('room_update', { players: room.getPlayerList() });
     console.log(`[加入] ${socket.id} → 房间 ${roomCode}`);
   });
 
-  // --- Game flow ---
   socket.on('start_game', ({ roomCode }) => {
     const room = rooms.get(roomCode);
     if (!room || room.hostId !== socket.id) return;
     room.start();
-    io.to(roomCode).emit('game_start', {
-      hostId: room.hostId,
-      players: room.getPlayerList(),
-    });
-    console.log(`[开始] 房间 ${roomCode} 游戏开始`);
+    io.to(roomCode).emit('game_start', { hostId: room.hostId, players: room.getPlayerList() });
+    console.log(`[开始] 房间 ${roomCode}`);
   });
 
-  // --- In-game sync ---
+  // In-game sync
   socket.on('player_state', ({ roomCode, x, y, direction, hp, shooting }) => {
+    socket.to(roomCode).emit('remote_state', { playerId: socket.id, x, y, direction, hp, shooting });
     const room = rooms.get(roomCode);
-    if (!room) return;
-    room.updatePlayer(socket.id, { x, y, direction, hp });
-    // Broadcast to others in room
-    socket.to(roomCode).emit('remote_state', {
-      playerId: socket.id,
-      x, y, direction, hp, shooting,
-    });
+    if (room) room.updatePlayer(socket.id, { x, y, direction, hp });
   });
 
   socket.on('bullet_fired', ({ roomCode, x, y, direction }) => {
@@ -127,7 +111,7 @@ io.on('connection', (socket) => {
     socket.to(roomCode).emit('remote_respawn', { playerId: socket.id, x, y });
   });
 
-  // --- Disconnect ---
+  // Disconnect
   socket.on('disconnect', () => {
     console.log(`[断开] ${socket.id}`);
     for (const [code, room] of rooms) {
@@ -135,10 +119,7 @@ io.on('connection', (socket) => {
         room.removePlayer(socket.id);
         socket.to(code).emit('player_left', { playerId: socket.id });
         io.to(code).emit('room_update', { players: room.getPlayerList() });
-        if (room.isEmpty()) {
-          rooms.delete(code);
-          console.log(`[删除] 房间 ${code} (无玩家)`);
-        }
+        if (room.isEmpty()) { rooms.delete(code); console.log(`[删除] 房间 ${code}`); }
       }
     }
   });
@@ -157,7 +138,7 @@ io.on('connection', (socket) => {
 const PORT = process.env.PORT || 3000;
 httpServer.listen(PORT, () => {
   console.log('═══════════════════════════════════');
-  console.log('  🎮 坦克世界大战 - 联机服务器');
+  console.log('  🎮 坦克世界大战');
   console.log(`  📡 http://localhost:${PORT}`);
   console.log('═══════════════════════════════════');
 });

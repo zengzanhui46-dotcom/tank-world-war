@@ -1,10 +1,9 @@
 services:
   - type: web
-    name: tank-world-war-server
+    name: tank-world-war
     env: node
-    rootDir: server
-    buildCommand: npm install
-    startCommand: npm start
+    buildCommand: npm install && npm run build
+    startCommand: node server/index.js
     envVars:
       - key: NODE_VERSION
         value: 18
