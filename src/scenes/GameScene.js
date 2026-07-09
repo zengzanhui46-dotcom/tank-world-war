@@ -35,9 +35,10 @@ export default class GameScene extends Phaser.Scene {
     this.enemyTanks = [];
     this.powerUps = [];
 
-    // Create base
+    // Create base with protection walls
     const basePos = this.levelData.basePos || { col: 12, row: 19 };
     this.base = new Base(this, basePos.col, basePos.row);
+    this.buildBaseDefense(basePos.col, basePos.row);
 
     // Create player
     const spawn = this.levelData.playerSpawn || { col: 9, row: 18 };
@@ -191,6 +192,28 @@ export default class GameScene extends Phaser.Scene {
         stroke: '#000', strokeThickness: 2,
       }).setOrigin(1, 0).setDepth(200).setScrollFactor(0);
     }
+  }
+
+  buildBaseDefense(baseCol, baseRow) {
+    // Place steel walls around the base (U-shape: left, top, right)
+    const positions = [
+      { col: baseCol - 1, row: baseRow },     // left
+      { col: baseCol + 1, row: baseRow },     // right
+      { col: baseCol - 1, row: baseRow - 1 }, // top-left
+      { col: baseCol,     row: baseRow - 1 }, // top
+      { col: baseCol + 1, row: baseRow - 1 }, // top-right
+    ];
+    positions.forEach(({ col, row }) => {
+      if (col >= 0 && col < 26 && row >= 0 && row < 20 && this.levelData.tiles[row][col] === 0) {
+        this.levelData.tiles[row][col] = 2; // STEEL
+        const x = col * TILE_SIZE + TILE_SIZE / 2;
+        const y = row * TILE_SIZE + TILE_SIZE / 2;
+        const wall = this.tileMap.wallGroup.create(x, y, 'tile_steel');
+        wall.setVisible(false);
+        wall.body.setSize(TILE_SIZE, TILE_SIZE);
+        wall.refreshBody();
+      }
+    });
   }
 
   buildEnemyQueue() {

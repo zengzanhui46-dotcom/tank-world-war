@@ -55,7 +55,6 @@ export default class MenuScene extends Phaser.Scene {
     const buttons = [
       { text: '🎮 开始游戏', action: () => this.scene.start('LevelSelectScene') },
       { text: '⚔ 多人联机', action: () => this.scene.start('LobbyScene') },
-      { text: '🔧 关卡编辑器', action: () => this.scene.start('LevelEditorScene') },
     ];
 
     buttons.forEach((btn, i) => {

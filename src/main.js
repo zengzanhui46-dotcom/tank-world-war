@@ -4,7 +4,6 @@ import BootScene from './scenes/BootScene.js';
 import MenuScene from './scenes/MenuScene.js';
 import GameScene from './scenes/GameScene.js';
 import LevelSelectScene from './scenes/LevelSelectScene.js';
-import LevelEditorScene from './scenes/LevelEditorScene.js';
 import GameOverScene from './scenes/GameOverScene.js';
 import LobbyScene from './scenes/LobbyScene.js';
 
@@ -29,7 +28,7 @@ const config = {
       debug: false,
     },
   },
-  scene: [BootScene, MenuScene, GameScene, LevelSelectScene, LevelEditorScene, GameOverScene, LobbyScene],
+  scene: [BootScene, MenuScene, GameScene, LevelSelectScene, GameOverScene, LobbyScene],
 };
 
 new Phaser.Game(config);

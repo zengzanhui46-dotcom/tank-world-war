@@ -16,6 +16,12 @@ export default class LobbyScene extends Phaser.Scene {
     this.cy = GAME_HEIGHT / 2;
     this.autoJoined = false;
 
+    // Auto-detect server URL: same origin if on Render/GitHub Pages, localhost for dev
+    const origin = location.origin;
+    this.serverUrl = (origin.includes('localhost') || origin.includes('127.0.0.1') || origin === 'null')
+      ? 'http://localhost:3000'
+      : origin;
+
     // Background
     this.add.rectangle(this.cx, this.cy, GAME_WIDTH, GAME_HEIGHT, 0x1a1a1a);
 
@@ -33,7 +39,6 @@ export default class LobbyScene extends Phaser.Scene {
 
     y += 20;
     // Preset buttons
-    this.serverUrl = 'http://localhost:3000';
 
     const presets = [
       { label: '本机', url: 'http://localhost:3000' },
