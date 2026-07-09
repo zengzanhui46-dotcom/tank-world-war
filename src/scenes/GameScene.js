@@ -82,12 +82,27 @@ export default class GameScene extends Phaser.Scene {
       stroke: '#000', strokeThickness: 2,
     }).setOrigin(0.5).setDepth(301).setVisible(false);
 
+    this.menuBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 65, '🏠 返回菜单', {
+      fontSize: '16px', fontFamily: 'Arial', color: '#ff9800',
+      stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(301).setVisible(false).setInteractive({ useHandCursor: true });
+
+    this.menuBtn.on('pointerover', () => this.menuBtn.setColor('#ffd700'));
+    this.menuBtn.on('pointerout', () => this.menuBtn.setColor('#ff9800'));
+    this.menuBtn.on('pointerdown', () => {
+      if (this.isMultiplayer && this.net) this.net.disconnect();
+      this.scene.start('MenuScene');
+    });
+
     this.pauseOverlay.setInteractive();
     this.pauseOverlay.on('pointerdown', () => {
-      this.isPaused = false;
-      this.pauseOverlay.setVisible(false);
-      this.pauseText.setVisible(false);
-      this.resumeText.setVisible(false);
+      if (this.isPaused) {
+        this.isPaused = false;
+        this.pauseOverlay.setVisible(false);
+        this.pauseText.setVisible(false);
+        this.resumeText.setVisible(false);
+        this.menuBtn.setVisible(false);
+      }
     });
 
     this.pauseBtn.on('pointerdown', () => {
@@ -95,6 +110,7 @@ export default class GameScene extends Phaser.Scene {
       this.pauseOverlay.setVisible(true);
       this.pauseText.setVisible(true);
       this.resumeText.setVisible(true);
+      this.menuBtn.setVisible(true);
     });
 
     this.isPaused = false;
