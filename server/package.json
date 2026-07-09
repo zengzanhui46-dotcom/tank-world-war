@@ -1,0 +1,13 @@
+{
+  "name": "tank-world-war-server",
+  "version": "1.0.0",
+  "description": "坦克世界大战联机服务器",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "socket.io": "^4.7.2",
+    "express": "^4.18.2"
+  }
+}
