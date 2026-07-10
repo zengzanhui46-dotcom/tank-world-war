@@ -41,55 +41,65 @@ export default class PlayerTank extends Tank {
       return;
     }
 
-    // Mobile: large visible virtual gamepad
+    // Mobile: extra-large virtual gamepad
     const gfx = scene.add.graphics().setDepth(400).setScrollFactor(0);
     const H = scene.scale.height;
     const W = scene.scale.width;
 
-    // Bottom control bar background
-    const barY = H - 170;
-    gfx.fillStyle(0x000000, 0.5);
-    gfx.fillRect(0, barY, W, 170);
+    // Bottom control bar - taller, darker
+    const barH = 220;
+    const barY = H - barH;
+    gfx.fillStyle(0x000000, 0.65);
+    gfx.fillRect(0, barY, W, barH);
+    gfx.lineStyle(2, 0x444444, 0.5);
+    gfx.lineBetween(0, barY, W, barY);
 
-    // --- D-pad (left side, BIG) ---
-    const padCX = 120, padCY = barY + 85, padR = 80;
-    gfx.fillStyle(0x333333, 0.6);
+    // --- D-pad (left side, EXTRA LARGE) ---
+    const padCX = 140, padCY = barY + 110, padR = 95;
+    gfx.fillStyle(0x222222, 0.7);
     gfx.fillCircle(padCX, padCY, padR);
-    gfx.lineStyle(3, 0x666666, 0.6);
+    gfx.lineStyle(3, 0x555555, 0.7);
     gfx.strokeCircle(padCX, padCY, padR);
+    // Cross lines
+    gfx.lineStyle(1, 0x444444, 0.4);
+    gfx.lineBetween(padCX - padR, padCY, padCX + padR, padCY);
+    gfx.lineBetween(padCX, padCY - padR, padCX, padCY + padR);
 
-    // Direction arrows with big hit areas
-    const btnSize = 50;
+    // Direction buttons: 65x65 hit areas, 38px font
+    const btnSize = 65;
     const dirs = [
-      { label: '▲', x: padCX, y: padCY - 40, dir: DIRECTIONS.UP },
-      { label: '▼', x: padCX, y: padCY + 40, dir: DIRECTIONS.DOWN },
-      { label: '◀', x: padCX - 45, y: padCY, dir: DIRECTIONS.LEFT },
-      { label: '▶', x: padCX + 45, y: padCY, dir: DIRECTIONS.RIGHT },
+      { label: '▲', x: padCX, y: padCY - 55, dir: DIRECTIONS.UP },
+      { label: '▼', x: padCX, y: padCY + 55, dir: DIRECTIONS.DOWN },
+      { label: '◀', x: padCX - 55, y: padCY, dir: DIRECTIONS.LEFT },
+      { label: '▶', x: padCX + 55, y: padCY, dir: DIRECTIONS.RIGHT },
     ];
 
     dirs.forEach(d => {
-      // Hit area background
-      const hitBg = scene.add.rectangle(d.x, d.y, btnSize, btnSize, 0xffffff, 0.15)
+      const hitBg = scene.add.rectangle(d.x, d.y, btnSize, btnSize, 0x444444, 0.5)
         .setDepth(400).setScrollFactor(0).setInteractive();
+      hitBg.setStrokeStyle(1, 0x666666);
       const btn = scene.add.text(d.x, d.y, d.label, {
-        fontSize: '30px', fontFamily: 'Arial', color: '#ffffff',
-        stroke: '#000', strokeThickness: 2,
+        fontSize: '36px', fontFamily: 'Arial', color: '#ffffff',
+        stroke: '#000', strokeThickness: 3,
       }).setOrigin(0.5).setDepth(401).setScrollFactor(0);
-      hitBg.on('pointerdown', () => { this.touchMoveDir = d.dir; hitBg.setFillStyle(0x4caf50, 0.4); });
-      hitBg.on('pointerup', () => { this.touchMoveDir = null; hitBg.setFillStyle(0xffffff, 0.15); });
-      hitBg.on('pointerout', () => { this.touchMoveDir = null; hitBg.setFillStyle(0xffffff, 0.15); });
+      hitBg.on('pointerdown', () => { this.touchMoveDir = d.dir; hitBg.setFillStyle(0x4caf50, 0.7); });
+      hitBg.on('pointerup', () => { this.touchMoveDir = null; hitBg.setFillStyle(0x444444, 0.5); });
+      hitBg.on('pointerout', () => { this.touchMoveDir = null; hitBg.setFillStyle(0x444444, 0.5); });
     });
 
-    // --- Fire button (right side, HUGE) ---
-    const fireX = W - 110, fireY = barY + 85, fireR = 65;
-    gfx.fillStyle(0xff4444, 0.35);
+    // --- Fire button (right side, MASSIVE) ---
+    const fireX = W - 140, fireY = barY + 110, fireR = 78;
+    gfx.fillStyle(0xcc0000, 0.5);
     gfx.fillCircle(fireX, fireY, fireR);
-    gfx.lineStyle(4, 0xff6666, 0.6);
+    gfx.lineStyle(4, 0xff4444, 0.7);
     gfx.strokeCircle(fireX, fireY, fireR);
+    // Inner ring
+    gfx.lineStyle(2, 0xff8888, 0.4);
+    gfx.strokeCircle(fireX, fireY, fireR - 12);
 
     const fireBtn = scene.add.text(fireX, fireY, '开火', {
-      fontSize: '26px', fontFamily: 'Arial', color: '#ffffff',
-      stroke: '#000', strokeThickness: 3,
+      fontSize: '32px', fontFamily: 'Arial', color: '#ffffff',
+      stroke: '#000', strokeThickness: 4,
     }).setOrigin(0.5).setDepth(401).setScrollFactor(0).setInteractive();
 
     fireBtn.on('pointerdown', () => { this.touchFire = true; });

@@ -20,9 +20,14 @@
       display: flex;
       justify-content: center;
       align-items: flex-start;
-      padding-top: 0;
     }
-    canvas { display: block; image-rendering: pixelated; }
+    #game-container canvas {
+      display: block;
+      image-rendering: pixelated;
+      margin-top: 0;
+      position: absolute;
+      top: 0;
+    }
   </style>
 </head>
 <body>
