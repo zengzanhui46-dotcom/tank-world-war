@@ -111,81 +111,73 @@ export default class GameScene extends Phaser.Scene {
 
     this.isPaused = false;
 
-    // ---- Multiplayer setup ----
+    // ---- Multiplayer setup (Host-Authoritative Model) ----
     this.remoteTanks = [];
     this.netSyncTimer = 0;
-    this.netSyncInterval = 50; // Send state every 50ms (20Hz)
+    this.netInputTimer = 0;
+    this.netSnapshotInterval = 100;  // Host sends snapshot every 100ms
+    this.netInputInterval = 50;      // Client sends input every 50ms
+    this.remotePlayerState = { x: 400, y: 600, direction: 0, shooting: false };
+    this.clientEnemyMap = new Map(); // Client-side enemy tracking by id
 
     if (this.isMultiplayer && this.net) {
-      // Create remote player tanks
+      // Create remote tank sprites
       this.remotePlayerInfos.forEach(p => {
         const rt = new RemoteTank(this, 400, 600, p);
         this.remoteTanks.push(rt);
       });
 
-      // Listen for remote state updates
-      this.net.on('remoteState', (data) => {
+      // ── Client receives full snapshot from Host ──
+      this.net.on('gameSnapshot', (snap) => {
+        if (this.isHost) return; // Host ignores its own snapshot
+        this.applySnapshot(snap);
+      });
+
+      // ── Host receives client input ──
+      this.net.on('remoteInput', (data) => {
+        if (!this.isHost) return;
+        this.remotePlayerState.x = data.x;
+        this.remotePlayerState.y = data.y;
+        this.remotePlayerState.direction = data.direction;
+        this.remotePlayerState.shooting = data.shooting;
+
+        // Update remote tank visual
         let rt = this.remoteTanks.find(t => t.playerId === data.playerId);
         if (!rt) {
-          // New player joined
-          rt = new RemoteTank(this, data.x, data.y, { id: data.playerId, name: '玩家' });
+          rt = new RemoteTank(this, data.x, data.y, { id: data.playerId, name: '队友' });
           this.remoteTanks.push(rt);
         }
         rt.updateState(data.x, data.y, data.direction);
-      });
 
-      // Remote bullet
-      this.net.on('remoteBullet', (data) => {
-        const b = new Bullet(this, data.x, data.y, 'bullet', data.direction, 300, true, false);
-        b.owner = 'remote';
-        this.enemyBullets.push(b);
-        playShoot();
-      });
-
-      // Host syncs enemies/powerups/base to clients
-      this.net.on('enemySync', (data) => {
-        if (!this.isHost) {
-          // Simple approach: just update enemy positions on client
-          // Full sync would require more complex state management
+        // Remote player shooting → create bullet on host
+        if (data.shooting) {
+          const now = this.time.now;
+          const rt2 = this.remoteTanks.find(t => t.playerId === data.playerId);
+          if (rt2 && (!rt2._lastShot || now - rt2._lastShot > 500)) {
+            rt2._lastShot = now;
+            const b = new Bullet(this, rt2.targetX, rt2.targetY, 'bullet', data.direction, 300, true, false);
+            b.owner = 'remote';
+            this.enemyBullets.push(b);
+          }
         }
       });
 
-      this.net.on('powerupSync', (data) => {
-        // Could recreate power-ups from sync data if needed
-      });
-
-      this.net.on('baseState', (data) => {
-        if (!this.isHost && data.destroyed && !this.base.isDestroyed) {
-          this.base.destroyBase();
-        }
-      });
-
+      // ── Both: game end ──
       this.net.on('gameEnd', (data) => {
         this.gameOver(data.victory);
       });
 
-      this.net.on('remoteDied', (data) => {
-        // Show remote player death
-        const rt = this.remoteTanks.find(t => t.playerId === data.playerId);
-        if (rt) {
-          this.spawnExplosion(rt.x, rt.y, true);
-          rt.setVisible(false);
-        }
-      });
-
-      this.net.on('remoteRespawn', (data) => {
-        const rt = this.remoteTanks.find(t => t.playerId === data.playerId);
-        if (rt) {
-          rt.setVisible(true);
-          rt.updateState(data.x, data.y, 0);
-        }
-      });
-
-      // Show multiplayer indicator
+      // Status indicator
       this.add.text(GAME_WIDTH - 10, GAME_HEIGHT - 20, this.isHost ? '🏠 主机' : '🚪 客户端', {
         fontSize: '11px', fontFamily: 'monospace', color: '#ffd700',
         stroke: '#000', strokeThickness: 2,
       }).setOrigin(1, 0).setDepth(200).setScrollFactor(0);
+
+      // If client, skip enemy/powerup spawning
+      if (!this.isHost) {
+        this.enemyQueue = [];
+        this.totalEnemies = 0;
+      }
     }
   }
 
@@ -295,14 +287,6 @@ export default class GameScene extends Phaser.Scene {
   playerDied() {
     this.spawnExplosion(this.player.x, this.player.y, true);
     const survived = this.player.respawn();
-    // Sync in multiplayer
-    if (this.isMultiplayer && this.net && this.net.isConnected()) {
-      if (survived) {
-        this.net.sendPlayerRespawn(this.player.x, this.player.y);
-      } else {
-        this.net.sendPlayerDied();
-      }
-    }
     if (!survived) this.gameOver(false);
   }
 
@@ -312,7 +296,7 @@ export default class GameScene extends Phaser.Scene {
     if (victory) playVictory(); else playDefeat();
 
     // Sync game end in multiplayer
-    if (this.isMultiplayer && this.net && this.net.isConnected()) {
+    if (this.isHost && this.isMultiplayer && this.net && this.net.isConnected()) {
       this.net.sendGameEnd(victory);
     }
 
@@ -324,8 +308,97 @@ export default class GameScene extends Phaser.Scene {
   /** Check if a bullet overlaps a tank sprite */
   bulletHitsTank(bullet, tank) {
     if (!tank || !tank.active) return false;
-    const d = Phaser.Math.Distance.Between(bullet.x, bullet.y, tank.x, tank.y);
-    return d < 16; // Half tile size
+    return Phaser.Math.Distance.Between(bullet.x, bullet.y, tank.x, tank.y) < 16;
+  }
+
+  // ── Client: apply full snapshot from host ──
+  applySnapshot(snap) {
+    if (!snap) return;
+
+    // Update remote player
+    if (snap.remotePlayer) {
+      let rt = this.remoteTanks.find(t => t.playerId === snap.remotePlayer.id);
+      if (!rt) {
+        rt = new RemoteTank(this, snap.remotePlayer.x, snap.remotePlayer.y, { id: snap.remotePlayer.id, name: '队友' });
+        this.remoteTanks.push(rt);
+      }
+      rt.updateState(snap.remotePlayer.x, snap.remotePlayer.y, snap.remotePlayer.direction);
+    }
+
+    // Sync enemies: create/update/remove
+    if (snap.enemies) {
+      const seenIds = new Set();
+      snap.enemies.forEach(e => {
+        seenIds.add(e.id);
+        let enemy = this.clientEnemyMap.get(e.id);
+        if (!enemy) {
+          // Create visual-only enemy on client
+          const cfg = TANK_TYPES[e.type.toUpperCase()] || TANK_TYPES.BASIC;
+          enemy = new EnemyTank(this, e.x, e.y, cfg);
+          this.enemyTanks.push(enemy);
+          this.clientEnemyMap.set(e.id, enemy);
+        }
+        // Smooth move toward target
+        enemy.x += (e.x - enemy.x) * 0.4;
+        enemy.y += (e.y - enemy.y) * 0.4;
+        enemy.direction = e.direction;
+        enemy.hp = e.hp;
+        if (e.hp <= 0 && enemy.active) {
+          enemy.destroy();
+          this.clientEnemyMap.delete(e.id);
+        }
+      });
+      // Remove enemies not in snapshot
+      this.clientEnemyMap.forEach((enemy, id) => {
+        if (!seenIds.has(id)) { enemy.destroy(); this.clientEnemyMap.delete(id); }
+      });
+    }
+
+    // Sync powerups
+    if (snap.powerups) {
+      // Remove old client powerups not in snapshot
+      this.powerUps.forEach((p, i) => {
+        const found = snap.powerups.find(sp => Math.abs(sp.x - p.x) < 16 && Math.abs(sp.y - p.y) < 16);
+        if (!found) p.collect();
+      });
+      // Add new ones
+      snap.powerups.forEach(sp => {
+        const exists = this.powerUps.find(p => Math.abs(sp.x - p.x) < 16 && Math.abs(sp.y - p.y) < 16);
+        if (!exists) {
+          const type = getRandomPowerUpType([sp.type]);
+          const pu = new PowerUp(this, sp.x, sp.y, type);
+          this.powerUps.push(pu);
+        }
+      });
+    }
+
+    // Base state
+    if (snap.baseDestroyed && !this.base.isDestroyed) {
+      this.base.destroyBase();
+    }
+
+    // Update counts
+    this.totalEnemies = snap.totalEnemies || this.totalEnemies;
+  }
+
+  // ── Host: build snapshot ──
+  buildSnapshot() {
+    return {
+      remotePlayer: {
+        id: this.net.playerId,
+        x: this.player.x, y: this.player.y,
+        direction: this.player.direction, hp: this.player.hp,
+      },
+      enemies: this.enemyTanks.filter(e => e.active).map((e, i) => ({
+        id: e._enemyId || (e._enemyId = Date.now() + i + Math.random()),
+        x: e.x, y: e.y, direction: e.direction, hp: e.hp, type: e.tankTypeKey,
+      })),
+      powerups: this.powerUps.filter(p => p.active).map(p => ({
+        x: p.x, y: p.y, type: p.powerUpType.key,
+      })),
+      baseDestroyed: this.base.isDestroyed,
+      totalEnemies: this.totalEnemies,
+    };
   }
 
   update(time, delta) {
@@ -337,39 +410,39 @@ export default class GameScene extends Phaser.Scene {
       bullet.owner = 'player';
       this.playerBullets.push(bullet);
       playShoot();
-      // Sync bullet to multiplayer
-      if (this.isMultiplayer && this.net && this.net.isConnected()) {
-        this.net.sendBullet(bullet.x, bullet.y, bullet.direction);
+    }
+
+    // ---- Enemy spawning (host only) ----
+    if (this.isHost || !this.isMultiplayer) {
+      this.spawnTimer += delta;
+      if (this.spawnTimer >= ENEMY_SPAWN_DELAY && this.enemyQueue.length > 0 && this.enemiesOnScreen < MAX_ENEMIES_ON_SCREEN) {
+        this.spawnTimer = 0;
+        this.spawnEnemy();
       }
     }
 
-    // ---- Enemy spawning ----
-    this.spawnTimer += delta;
-    if (this.spawnTimer >= ENEMY_SPAWN_DELAY && this.enemyQueue.length > 0 && this.enemiesOnScreen < MAX_ENEMIES_ON_SCREEN) {
-      this.spawnTimer = 0;
-      this.spawnEnemy();
-    }
-
-    // ---- Enemy AI ----
-    const liveEnemies = [...this.enemyTanks];
-    for (const enemy of liveEnemies) {
-      if (!enemy.active) continue;
-      try {
-        const eb = enemy.updateAI(delta);
-        if (eb) {
-          eb.owner = enemy;
-          this.enemyBullets.push(eb);
-        }
-        enemy.updateShieldPosition();
-        if (enemy.body) {
-          const cols = this.tileMap.checkCollision(enemy.x, enemy.y, enemy.body.width, enemy.body.height);
-          if ((enemy.direction === DIRECTIONS.UP && cols.up) || (enemy.direction === DIRECTIONS.DOWN && cols.down) ||
-              (enemy.direction === DIRECTIONS.LEFT && cols.left) || (enemy.direction === DIRECTIONS.RIGHT && cols.right)) {
-            enemy.stop();
-            if (enemy.ai) enemy.ai.moveTimer = 9999;
+    // ---- Enemy AI (host only) ----
+    if (this.isHost || !this.isMultiplayer) {
+      const liveEnemies = [...this.enemyTanks];
+      for (const enemy of liveEnemies) {
+        if (!enemy.active) continue;
+        try {
+          const eb = enemy.updateAI(delta);
+          if (eb) {
+            eb.owner = enemy;
+            this.enemyBullets.push(eb);
           }
-        }
-      } catch (err) { console.error('enemy error', err); }
+          enemy.updateShieldPosition();
+          if (enemy.body) {
+            const cols = this.tileMap.checkCollision(enemy.x, enemy.y, enemy.body.width, enemy.body.height);
+            if ((enemy.direction === DIRECTIONS.UP && cols.up) || (enemy.direction === DIRECTIONS.DOWN && cols.down) ||
+                (enemy.direction === DIRECTIONS.LEFT && cols.left) || (enemy.direction === DIRECTIONS.RIGHT && cols.right)) {
+              enemy.stop();
+              if (enemy.ai) enemy.ai.moveTimer = 9999;
+            }
+          }
+        } catch (err) { console.error('enemy error', err); }
+      }
     }
 
     // ---- Update bullets ----
@@ -463,17 +536,21 @@ export default class GameScene extends Phaser.Scene {
     this.enemyTanks = this.enemyTanks.filter(e => { if (!e.active || e.destroyed) { this.enemiesOnScreen--; return false; } return true; });
     this.powerUps = this.powerUps.filter(p => p.active);
 
-    // ---- Power-up spawn ----
-    this.powerUpSpawnTimer -= delta;
-    if (this.powerUpSpawnTimer <= 0) {
-      this.spawnPowerUp();
-      this.powerUpSpawnTimer = Phaser.Math.Between(POWERUP_SPAWN_MIN, POWERUP_SPAWN_MAX);
+    // ---- Power-up spawn (host only) ----
+    if (this.isHost || !this.isMultiplayer) {
+      this.powerUpSpawnTimer -= delta;
+      if (this.powerUpSpawnTimer <= 0) {
+        this.spawnPowerUp();
+        this.powerUpSpawnTimer = Phaser.Math.Between(POWERUP_SPAWN_MIN, POWERUP_SPAWN_MAX);
+      }
     }
 
-    // ---- Win condition ----
-    const remaining = this.enemyTanks.filter(e => e.active).length + this.enemyQueue.length;
-    if (remaining === 0 && this.spawnedCount >= this.totalEnemies) {
-      this.gameOver(true);
+    // ---- Win condition (host only) ----
+    if (this.isHost || !this.isMultiplayer) {
+      const remaining = this.enemyTanks.filter(e => e.active).length + this.enemyQueue.length;
+      if (remaining === 0 && this.spawnedCount >= this.totalEnemies) {
+        this.gameOver(true);
+      }
     }
 
     // ---- HUD ----
@@ -490,29 +567,27 @@ export default class GameScene extends Phaser.Scene {
 
     // ---- Multiplayer sync ----
     if (this.isMultiplayer && this.net && this.net.isConnected()) {
-      this.netSyncTimer += delta;
-      if (this.netSyncTimer >= this.netSyncInterval) {
-        this.netSyncTimer = 0;
-        // Send my state
-        this.net.sendPlayerState(
-          this.player.x, this.player.y, this.player.direction, this.player.hp, false
-        );
-
-        // Host syncs game state to clients
-        if (this.isHost) {
-          this.net.sendEnemySync(this.enemyTanks);
-          this.net.sendPowerUpSync(this.powerUps);
+      if (this.isHost) {
+        // Host: send full snapshot periodically
+        this.netSyncTimer += delta;
+        if (this.netSyncTimer >= this.netSnapshotInterval) {
+          this.netSyncTimer = 0;
+          this.net.sendSnapshot(this.buildSnapshot());
         }
+      } else {
+        // Client: send input only
+        this.netInputTimer += delta;
+        if (this.netInputTimer >= this.netInputInterval) {
+          this.netInputTimer = 0;
+          this.net.sendInput(this.player.x, this.player.y, this.player.direction, false);
+        }
+        // Client: skip enemy AI & spawning
+        this.enemyQueue = [];
       }
 
-      // Update remote tanks
+      // Update remote tank visuals
       for (const rt of this.remoteTanks) {
         if (rt.visible) rt.updatePosition();
-      }
-
-      // Sync base state if destroyed
-      if (this.isHost && this.base.isDestroyed) {
-        this.net.sendBaseState(true);
       }
     }
   }

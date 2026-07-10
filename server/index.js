@@ -87,16 +87,14 @@ io.on('connection', (socket) => {
     socket.to(roomCode).emit('remote_bullet', { playerId: socket.id, x, y, direction });
   });
 
-  socket.on('enemy_sync', ({ roomCode, enemies }) => {
-    socket.to(roomCode).emit('enemy_sync', { enemies });
+  // Host → Clients: full game state snapshot (batched, efficient)
+  socket.on('game_snapshot', ({ roomCode, snapshot }) => {
+    socket.to(roomCode).emit('game_snapshot', snapshot);
   });
 
-  socket.on('powerup_sync', ({ roomCode, powerups }) => {
-    socket.to(roomCode).emit('powerup_sync', { powerups });
-  });
-
-  socket.on('base_state', ({ roomCode, destroyed }) => {
-    socket.to(roomCode).emit('base_state', { destroyed });
+  // Client → Host: player input only
+  socket.on('client_input', ({ roomCode, input }) => {
+    socket.to(roomCode).emit('client_input', { playerId: socket.id, ...input });
   });
 
   socket.on('game_end', ({ roomCode, victory }) => {
