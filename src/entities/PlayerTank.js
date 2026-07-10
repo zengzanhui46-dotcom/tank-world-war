@@ -41,45 +41,55 @@ export default class PlayerTank extends Tank {
       return;
     }
 
-    // Mobile: visible virtual gamepad
+    // Mobile: large visible virtual gamepad
     const gfx = scene.add.graphics().setDepth(400).setScrollFactor(0);
-    const padCX = 100, padCY = scene.scale.height - 120, padR = 70;
+    const H = scene.scale.height;
+    const W = scene.scale.width;
 
-    // Draw D-pad background
-    gfx.fillStyle(0xffffff, 0.1);
+    // Bottom control bar background
+    const barY = H - 170;
+    gfx.fillStyle(0x000000, 0.5);
+    gfx.fillRect(0, barY, W, 170);
+
+    // --- D-pad (left side, BIG) ---
+    const padCX = 120, padCY = barY + 85, padR = 80;
+    gfx.fillStyle(0x333333, 0.6);
     gfx.fillCircle(padCX, padCY, padR);
-    gfx.lineStyle(2, 0xffffff, 0.3);
+    gfx.lineStyle(3, 0x666666, 0.6);
     gfx.strokeCircle(padCX, padCY, padR);
 
-    // 4 directional zones
-    const dirBtns = [];
+    // Direction arrows with big hit areas
+    const btnSize = 50;
     const dirs = [
-      { label: '▲', x: padCX, y: padCY - 28, dir: DIRECTIONS.UP },
-      { label: '▼', x: padCX, y: padCY + 28, dir: DIRECTIONS.DOWN },
-      { label: '◀', x: padCX - 28, y: padCY, dir: DIRECTIONS.LEFT },
-      { label: '▶', x: padCX + 28, y: padCY, dir: DIRECTIONS.RIGHT },
+      { label: '▲', x: padCX, y: padCY - 40, dir: DIRECTIONS.UP },
+      { label: '▼', x: padCX, y: padCY + 40, dir: DIRECTIONS.DOWN },
+      { label: '◀', x: padCX - 45, y: padCY, dir: DIRECTIONS.LEFT },
+      { label: '▶', x: padCX + 45, y: padCY, dir: DIRECTIONS.RIGHT },
     ];
 
     dirs.forEach(d => {
+      // Hit area background
+      const hitBg = scene.add.rectangle(d.x, d.y, btnSize, btnSize, 0xffffff, 0.15)
+        .setDepth(400).setScrollFactor(0).setInteractive();
       const btn = scene.add.text(d.x, d.y, d.label, {
-        fontSize: '22px', fontFamily: 'Arial', color: '#ffffff',
-      }).setOrigin(0.5).setDepth(401).setScrollFactor(0).setAlpha(0.5).setInteractive();
-      btn.on('pointerdown', () => { this.touchMoveDir = d.dir; });
-      btn.on('pointerup', () => { this.touchMoveDir = null; });
-      btn.on('pointerout', () => { this.touchMoveDir = null; });
-      dirBtns.push(btn);
+        fontSize: '30px', fontFamily: 'Arial', color: '#ffffff',
+        stroke: '#000', strokeThickness: 2,
+      }).setOrigin(0.5).setDepth(401).setScrollFactor(0);
+      hitBg.on('pointerdown', () => { this.touchMoveDir = d.dir; hitBg.setFillStyle(0x4caf50, 0.4); });
+      hitBg.on('pointerup', () => { this.touchMoveDir = null; hitBg.setFillStyle(0xffffff, 0.15); });
+      hitBg.on('pointerout', () => { this.touchMoveDir = null; hitBg.setFillStyle(0xffffff, 0.15); });
     });
 
-    // Fire button (bottom-right)
-    const fireX = scene.scale.width - 90, fireY = scene.scale.height - 110, fireR = 45;
-    gfx.fillStyle(0xff4444, 0.25);
+    // --- Fire button (right side, HUGE) ---
+    const fireX = W - 110, fireY = barY + 85, fireR = 65;
+    gfx.fillStyle(0xff4444, 0.35);
     gfx.fillCircle(fireX, fireY, fireR);
-    gfx.lineStyle(3, 0xff4444, 0.5);
+    gfx.lineStyle(4, 0xff6666, 0.6);
     gfx.strokeCircle(fireX, fireY, fireR);
 
     const fireBtn = scene.add.text(fireX, fireY, '开火', {
-      fontSize: '18px', fontFamily: 'Arial', color: '#ff6666',
-      stroke: '#000', strokeThickness: 2,
+      fontSize: '26px', fontFamily: 'Arial', color: '#ffffff',
+      stroke: '#000', strokeThickness: 3,
     }).setOrigin(0.5).setDepth(401).setScrollFactor(0).setInteractive();
 
     fireBtn.on('pointerdown', () => { this.touchFire = true; });
