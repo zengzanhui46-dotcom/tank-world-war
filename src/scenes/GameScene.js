@@ -182,30 +182,27 @@ export default class GameScene extends Phaser.Scene {
   }
 
   buildBaseDefense(baseCol, baseRow) {
-    // Place steel walls around the base (U-shape: left, top, right)
+    if (!this.tileMap || !this.tileMap.tileSprites) return;
     const positions = [
-      { col: baseCol - 1, row: baseRow },     // left
-      { col: baseCol + 1, row: baseRow },     // right
-      { col: baseCol - 1, row: baseRow - 1 }, // top-left
-      { col: baseCol,     row: baseRow - 1 }, // top
-      { col: baseCol + 1, row: baseRow - 1 }, // top-right
+      { col: baseCol - 1, row: baseRow },
+      { col: baseCol + 1, row: baseRow },
+      { col: baseCol - 1, row: baseRow - 1 },
+      { col: baseCol,     row: baseRow - 1 },
+      { col: baseCol + 1, row: baseRow - 1 },
     ];
     positions.forEach(({ col, row }) => {
-      if (col >= 0 && col < 26 && row >= 0 && row < 20 && this.levelData.tiles[row][col] === 0) {
-        this.levelData.tiles[row][col] = 2; // STEEL
-        // Update tile visual to show steel wall
-        if (this.tileMap.tileSprites[row] && this.tileMap.tileSprites[row][col]) {
-          this.tileMap.tileSprites[row][col].setTexture('tile_steel');
-        }
-        // Add physics body for collision
-        const x = col * TILE_SIZE + TILE_SIZE / 2;
-        const y = row * TILE_SIZE + TILE_SIZE / 2;
-        const wall = this.tileMap.wallGroup.create(x, y, 'tile_steel');
-        wall.setVisible(true);
-        wall.setAlpha(1);
-        wall.body.setSize(TILE_SIZE, TILE_SIZE);
-        wall.refreshBody();
+      if (col < 0 || col >= 26 || row < 0 || row >= 20) return;
+      if (this.levelData.tiles[row][col] !== 0) return;
+      this.levelData.tiles[row][col] = 2;
+      if (this.tileMap.tileSprites[row] && this.tileMap.tileSprites[row][col]) {
+        this.tileMap.tileSprites[row][col].setTexture('tile_steel');
       }
+      const x = col * TILE_SIZE + TILE_SIZE / 2;
+      const y = row * TILE_SIZE + TILE_SIZE / 2;
+      const wall = this.tileMap.wallGroup.create(x, y, 'tile_steel');
+      wall.setVisible(true);
+      wall.body.setSize(TILE_SIZE, TILE_SIZE);
+      wall.refreshBody();
     });
   }
 

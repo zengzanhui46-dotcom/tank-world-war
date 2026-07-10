@@ -26,52 +26,42 @@ export default class PlayerTank extends Tank {
   }
 
   setupHTMLControls() {
-    // Direction buttons
-    const dpadBtns = document.querySelectorAll('.dpad-btn');
-    dpadBtns.forEach(btn => {
-      const dirMap = { up: DIRECTIONS.UP, down: DIRECTIONS.DOWN, left: DIRECTIONS.LEFT, right: DIRECTIONS.RIGHT };
-      const onDown = (e) => {
-        e.preventDefault();
-        this.touchMoveDir = dirMap[btn.dataset.dir];
-        btn.classList.add('pressed');
-      };
-      const onUp = (e) => {
-        e.preventDefault();
-        this.touchMoveDir = null;
-        btn.classList.remove('pressed');
-      };
-      btn.addEventListener('pointerdown', onDown);
-      btn.addEventListener('pointerup', onUp);
-      btn.addEventListener('pointerleave', onUp);
-      btn.addEventListener('pointercancel', onUp);
-    });
+    try {
+      // Direction buttons
+      const dpadBtns = document.querySelectorAll('.dpad-btn');
+      if (dpadBtns.length > 0) {
+        const dirMap = { up: DIRECTIONS.UP, down: DIRECTIONS.DOWN, left: DIRECTIONS.LEFT, right: DIRECTIONS.RIGHT };
+        dpadBtns.forEach(btn => {
+          const onDown = (e) => {
+            e.preventDefault();
+            this.touchMoveDir = dirMap[btn.dataset.dir];
+            btn.classList.add('pressed');
+          };
+          const onUp = (e) => {
+            e.preventDefault();
+            this.touchMoveDir = null;
+            btn.classList.remove('pressed');
+          };
+          btn.addEventListener('pointerdown', onDown);
+          btn.addEventListener('pointerup', onUp);
+          btn.addEventListener('pointerleave', onUp);
+          btn.addEventListener('pointercancel', onUp);
+        });
+      }
 
-    // Fire button
-    const fireBtn = document.getElementById('fire-btn');
-    if (fireBtn) {
-      fireBtn.addEventListener('pointerdown', (e) => {
-        e.preventDefault();
-        this.touchFire = true;
-        fireBtn.classList.add('pressed');
-      });
-      fireBtn.addEventListener('pointerup', (e) => {
-        e.preventDefault();
-        this.touchFire = false;
-        fireBtn.classList.remove('pressed');
-      });
-      fireBtn.addEventListener('pointerleave', (e) => {
-        this.touchFire = false;
-        fireBtn.classList.remove('pressed');
-      });
-      fireBtn.addEventListener('pointercancel', (e) => {
-        this.touchFire = false;
-        fireBtn.classList.remove('pressed');
-      });
+      // Fire button
+      const fireBtn = document.getElementById('fire-btn');
+      if (fireBtn) {
+        const onFireDown = (e) => { e.preventDefault(); this.touchFire = true; fireBtn.classList.add('pressed'); };
+        const onFireUp = (e) => { e.preventDefault(); this.touchFire = false; fireBtn.classList.remove('pressed'); };
+        fireBtn.addEventListener('pointerdown', onFireDown);
+        fireBtn.addEventListener('pointerup', onFireUp);
+        fireBtn.addEventListener('pointerleave', onFireUp);
+        fireBtn.addEventListener('pointercancel', onFireUp);
+      }
+    } catch (e) {
+      // HTML controls are optional — game works fine with keyboard only
     }
-
-    // Control bar always visible on mobile
-    const bar = document.getElementById('control-bar');
-    if (bar) bar.style.display = 'flex';
   }
 
   handleInput(tileMap) {
