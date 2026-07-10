@@ -25,7 +25,7 @@ export const TANK_TYPES = {
   PLAYER: {
     key: 'player',
     speed: 150,
-    hp: 3,
+    hp: 1,
     fireRate: 500,
     bulletSpeed: 300,
     color: 0x4caf50,

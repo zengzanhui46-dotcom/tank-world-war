@@ -29,7 +29,7 @@ export default class HUD {
 
   update(player, totalEnemies, remainingEnemies, levelName) {
     // Canvas HUD
-    this.livesText.setText(`❤ x${player.lives}  HP:${player.hp}`);
+    this.livesText.setText(`❤ x${player.lives}`);
     this.enemyText.setText(`🎯 ${remainingEnemies}/${totalEnemies}`);
     this.levelText.setText(levelName);
 
@@ -38,7 +38,7 @@ export default class HUD {
     this.powerUpText.setText(active.length > 0 ? `增强: ${active.join(' ')}` : '');
 
     // HTML HUD
-    if (this.htmlLives) this.htmlLives.textContent = `❤ x${player.lives}  HP:${player.hp}`;
+    if (this.htmlLives) this.htmlLives.textContent = `❤ x${player.lives}`;
     if (this.htmlEnemies) this.htmlEnemies.textContent = `🎯 敌人: ${remainingEnemies}/${totalEnemies}`;
     if (this.htmlPowerups) this.htmlPowerups.textContent = active.length > 0 ? active.join(' ') : '';
     if (this.htmlLevel) this.htmlLevel.textContent = levelName || '';

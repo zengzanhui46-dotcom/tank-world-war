@@ -193,10 +193,16 @@ export default class GameScene extends Phaser.Scene {
     positions.forEach(({ col, row }) => {
       if (col >= 0 && col < 26 && row >= 0 && row < 20 && this.levelData.tiles[row][col] === 0) {
         this.levelData.tiles[row][col] = 2; // STEEL
+        // Update tile visual to show steel wall
+        if (this.tileMap.tileSprites[row] && this.tileMap.tileSprites[row][col]) {
+          this.tileMap.tileSprites[row][col].setTexture('tile_steel');
+        }
+        // Add physics body for collision
         const x = col * TILE_SIZE + TILE_SIZE / 2;
         const y = row * TILE_SIZE + TILE_SIZE / 2;
         const wall = this.tileMap.wallGroup.create(x, y, 'tile_steel');
-        wall.setVisible(false);
+        wall.setVisible(true);
+        wall.setAlpha(1);
         wall.body.setSize(TILE_SIZE, TILE_SIZE);
         wall.refreshBody();
       }
@@ -478,15 +484,14 @@ export default class GameScene extends Phaser.Scene {
       }
     }
 
-    // ---- Enemy bullets vs player ----
+    // ---- Enemy bullets vs player (one hit = one life lost + respawn) ----
     for (const b of this.enemyBullets) {
       if (!b.alive) continue;
-      if (this.bulletHitsTank(b, this.player)) {
-        const killed = this.player.takeDamage(1);
+      if (this.bulletHitsTank(b, this.player) && !this.player.shieldActive) {
         this.spawnExplosion(b.x, b.y);
         b.kill();
         playExplosion();
-        if (killed) this.playerDied();
+        this.playerDied();
       }
     }
 
