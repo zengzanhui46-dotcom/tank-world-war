@@ -62,16 +62,21 @@ export default class GameScene extends Phaser.Scene {
     // Game state
     this.gameEnded = false;
 
-    // Pause button
-    this.pauseBtn = this.add.text(this.scale.width - 10, 28, '⏸ 暂停', {
-      fontSize: '14px',
-      fontFamily: 'monospace',
-      color: '#ffaa00',
-      stroke: '#000',
-      strokeThickness: 2,
-    }).setOrigin(1, 0).setDepth(200).setScrollFactor(0).setInteractive();
+    // HTML pause button
+    const pauseBtn = document.getElementById('pause-btn');
+    if (pauseBtn) {
+      pauseBtn.style.display = 'block';
+      pauseBtn.onclick = () => {
+        this.isPaused = !this.isPaused;
+        this.pauseOverlay.setVisible(this.isPaused);
+        this.pauseText.setVisible(this.isPaused);
+        this.resumeText.setVisible(this.isPaused);
+        this.menuBtn.setVisible(this.isPaused);
+        pauseBtn.textContent = this.isPaused ? '▶ 继续' : '⏸ 暂停';
+      };
+    }
 
-    // Pause overlay
+    // Pause overlay (inside canvas)
     this.pauseOverlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.7)
       .setDepth(300).setVisible(false);
     this.pauseText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 30, '游 戏 暂 停', {
@@ -87,7 +92,6 @@ export default class GameScene extends Phaser.Scene {
       fontSize: '16px', fontFamily: 'Arial', color: '#ff9800',
       stroke: '#000', strokeThickness: 2,
     }).setOrigin(0.5).setDepth(301).setVisible(false).setInteractive({ useHandCursor: true });
-
     this.menuBtn.on('pointerover', () => this.menuBtn.setColor('#ffd700'));
     this.menuBtn.on('pointerout', () => this.menuBtn.setColor('#ff9800'));
     this.menuBtn.on('pointerdown', () => {
@@ -97,21 +101,12 @@ export default class GameScene extends Phaser.Scene {
 
     this.pauseOverlay.setInteractive();
     this.pauseOverlay.on('pointerdown', () => {
-      if (this.isPaused) {
-        this.isPaused = false;
-        this.pauseOverlay.setVisible(false);
-        this.pauseText.setVisible(false);
-        this.resumeText.setVisible(false);
-        this.menuBtn.setVisible(false);
-      }
-    });
-
-    this.pauseBtn.on('pointerdown', () => {
-      this.isPaused = true;
-      this.pauseOverlay.setVisible(true);
-      this.pauseText.setVisible(true);
-      this.resumeText.setVisible(true);
-      this.menuBtn.setVisible(true);
+      this.isPaused = false;
+      this.pauseOverlay.setVisible(false);
+      this.pauseText.setVisible(false);
+      this.resumeText.setVisible(false);
+      this.menuBtn.setVisible(false);
+      if (pauseBtn) pauseBtn.textContent = '⏸ 暂停';
     });
 
     this.isPaused = false;
